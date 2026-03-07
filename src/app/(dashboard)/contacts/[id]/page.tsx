@@ -387,8 +387,8 @@ export default function ContactDetailPage() {
                     className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
                   >
                     <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
                     <option value="unsubscribed">Unsubscribed</option>
+                    <option value="bounced">Bounced</option>
                   </select>
                 </div>
                 <div>

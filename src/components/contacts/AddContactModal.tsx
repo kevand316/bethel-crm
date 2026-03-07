@@ -32,7 +32,7 @@ export default function AddContactModal({ open, onClose, onSuccess }: AddContact
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const { error } = await supabase.from('contacts').insert({
+    const { data: contact, error } = await supabase.from('contacts').insert({
       first_name: form.first_name || null,
       last_name: form.last_name || null,
       email: form.email || null,
@@ -40,25 +40,14 @@ export default function AddContactModal({ open, onClose, onSuccess }: AddContact
       tags,
       source: 'manual',
       status: 'active',
-    });
+    }).select('id').single();
 
-    if (!error) {
-      const { data: contact } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('email', form.email || '__none__')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (contact) {
-        await supabase.from('activity_log').insert({
-          contact_id: contact.id,
-          type: 'contact_created',
-          description: 'Manually added contact',
-        });
-      }
-
+    if (!error && contact) {
+      await supabase.from('activity_log').insert({
+        contact_id: contact.id,
+        type: 'contact_created',
+        description: 'Manually added contact',
+      });
       setForm({ first_name: '', last_name: '', email: '', phone: '', tags: '' });
       onSuccess();
     }

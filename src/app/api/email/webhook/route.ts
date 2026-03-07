@@ -33,23 +33,13 @@ export async function POST(request: Request) {
           .update({ status: 'opened', opened_at: new Date().toISOString() })
           .eq('id', emailSend.id);
 
-        // Update campaign stats
         if (emailSend.campaign_id) {
-          const { data: campaign } = await supabase
-            .from('email_campaigns')
-            .select('total_opened')
-            .eq('id', emailSend.campaign_id)
-            .single();
-
-          if (campaign) {
-            await supabase
-              .from('email_campaigns')
-              .update({ total_opened: campaign.total_opened + 1 })
-              .eq('id', emailSend.campaign_id);
-          }
+          await supabase.rpc('increment_campaign_stat', {
+            p_campaign_id: emailSend.campaign_id,
+            p_field: 'total_opened',
+          });
         }
 
-        // Log activity
         await supabase.from('activity_log').insert({
           contact_id: emailSend.contact_id,
           type: 'email_opened',
@@ -65,18 +55,10 @@ export async function POST(request: Request) {
           .eq('id', emailSend.id);
 
         if (emailSend.campaign_id) {
-          const { data: campaign } = await supabase
-            .from('email_campaigns')
-            .select('total_clicked')
-            .eq('id', emailSend.campaign_id)
-            .single();
-
-          if (campaign) {
-            await supabase
-              .from('email_campaigns')
-              .update({ total_clicked: campaign.total_clicked + 1 })
-              .eq('id', emailSend.campaign_id);
-          }
+          await supabase.rpc('increment_campaign_stat', {
+            p_campaign_id: emailSend.campaign_id,
+            p_field: 'total_clicked',
+          });
         }
         break;
       }
@@ -87,23 +69,13 @@ export async function POST(request: Request) {
           .update({ status: 'bounced', bounced_at: new Date().toISOString() })
           .eq('id', emailSend.id);
 
-        // Update campaign stats
         if (emailSend.campaign_id) {
-          const { data: campaign } = await supabase
-            .from('email_campaigns')
-            .select('total_bounced')
-            .eq('id', emailSend.campaign_id)
-            .single();
-
-          if (campaign) {
-            await supabase
-              .from('email_campaigns')
-              .update({ total_bounced: campaign.total_bounced + 1 })
-              .eq('id', emailSend.campaign_id);
-          }
+          await supabase.rpc('increment_campaign_stat', {
+            p_campaign_id: emailSend.campaign_id,
+            p_field: 'total_bounced',
+          });
         }
 
-        // Mark contact as bounced
         if (emailSend.contact_id) {
           await supabase
             .from('contacts')

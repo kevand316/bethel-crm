@@ -46,9 +46,7 @@ export default function SmsBroadcastPage() {
       .not('phone', 'is', null);
 
     if (selectedTags.length > 0) {
-      for (const tag of selectedTags) {
-        query = query.contains('tags', JSON.stringify([tag]));
-      }
+      query = query.or(selectedTags.map((tag) => `tags.cs.${JSON.stringify([tag])}`).join(','));
     }
 
     const { data } = await query;

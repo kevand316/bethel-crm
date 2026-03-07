@@ -72,39 +72,43 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchStats = useCallback(async () => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const [
-      contactsRes,
-      activeRes,
-      monthRes,
-      emailSendsRes,
-      emailOpenedRes,
-      emailBouncedRes,
-      smsSentRes,
-      smsReceivedRes,
-    ] = await Promise.all([
-      supabase.from('contacts').select('id', { count: 'exact', head: true }),
-      supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('contacts').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
-      supabase.from('email_sends').select('id', { count: 'exact', head: true }),
-      supabase.from('email_sends').select('id', { count: 'exact', head: true }).eq('status', 'opened'),
-      supabase.from('email_sends').select('id', { count: 'exact', head: true }).eq('status', 'bounced'),
-      supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'outbound'),
-      supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound'),
-    ]);
+      const [
+        contactsRes,
+        activeRes,
+        monthRes,
+        emailSendsRes,
+        emailOpenedRes,
+        emailBouncedRes,
+        smsSentRes,
+        smsReceivedRes,
+      ] = await Promise.all([
+        supabase.from('contacts').select('id', { count: 'exact', head: true }),
+        supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('contacts').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
+        supabase.from('email_sends').select('id', { count: 'exact', head: true }),
+        supabase.from('email_sends').select('id', { count: 'exact', head: true }).eq('status', 'opened'),
+        supabase.from('email_sends').select('id', { count: 'exact', head: true }).eq('status', 'bounced'),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'outbound'),
+        supabase.from('sms_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound'),
+      ]);
 
-    setStats({
-      totalContacts: contactsRes.count || 0,
-      activeContacts: activeRes.count || 0,
-      totalEmailsSent: emailSendsRes.count || 0,
-      totalEmailsOpened: emailOpenedRes.count || 0,
-      totalEmailsBounced: emailBouncedRes.count || 0,
-      totalSmsSent: smsSentRes.count || 0,
-      totalSmsReceived: smsReceivedRes.count || 0,
-      contactsThisMonth: monthRes.count || 0,
-    });
+      setStats({
+        totalContacts: contactsRes.count || 0,
+        activeContacts: activeRes.count || 0,
+        totalEmailsSent: emailSendsRes.count || 0,
+        totalEmailsOpened: emailOpenedRes.count || 0,
+        totalEmailsBounced: emailBouncedRes.count || 0,
+        totalSmsSent: smsSentRes.count || 0,
+        totalSmsReceived: smsReceivedRes.count || 0,
+        contactsThisMonth: monthRes.count || 0,
+      });
+    } catch {
+      // Keep default zero values on error — dashboard still renders
+    }
   }, [supabase]);
 
   const fetchActivity = useCallback(async () => {
