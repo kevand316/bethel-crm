@@ -6,29 +6,52 @@ import { useRouter } from 'next/navigation';
 import { Lock, Mail, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
+    if (mode === 'signup') {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        setLoading(false);
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters.');
+        setLoading(false);
+        return;
+      }
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccess('Account created! You can now sign in.');
+        setMode('signin');
+        setPassword('');
+        setConfirmPassword('');
+      }
       setLoading(false);
     } else {
-      router.push('/dashboard');
-      router.refresh();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        router.push('/dashboard');
+        router.refresh();
+      }
     }
   };
 
@@ -51,12 +74,16 @@ export default function LoginPage() {
           <p className="text-gold-light/70 text-sm tracking-wide">Bethel Residency Management</p>
         </div>
 
-        {/* Login Card */}
+        {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl shadow-black/20 p-8 border border-white/10">
-          <h2 className="text-xl font-serif text-navy mb-1">Welcome back</h2>
-          <p className="text-sm text-navy/50 mb-6">Sign in to your account to continue</p>
+          <h2 className="text-xl font-serif text-navy mb-1">
+            {mode === 'signin' ? 'Welcome back' : 'Create account'}
+          </h2>
+          <p className="text-sm text-navy/50 mb-6">
+            {mode === 'signin' ? 'Sign in to your account to continue' : 'Set up your staff account'}
+          </p>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-xs font-semibold text-navy/70 uppercase tracking-wider mb-1.5">
                 Email
@@ -94,10 +121,37 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {mode === 'signup' && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-xs font-semibold text-navy/70 uppercase tracking-wider mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-navy/30" />
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-cream-dark rounded-xl focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold bg-cream text-navy placeholder-navy/30 text-sm transition-all"
+                    placeholder="Confirm your password"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="flex items-start gap-2 text-red-600 text-sm bg-red-50 border border-red-100 p-3 rounded-xl animate-scale-in">
                 <div className="w-1 h-1 rounded-full bg-red-500 mt-1.5 shrink-0" />
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="flex items-start gap-2 text-green-700 text-sm bg-green-50 border border-green-100 p-3 rounded-xl">
+                <div className="w-1 h-1 rounded-full bg-green-500 mt-1.5 shrink-0" />
+                {success}
               </div>
             )}
 
@@ -109,13 +163,22 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Signing in...
+                  {mode === 'signin' ? 'Signing in...' : 'Creating account...'}
                 </>
               ) : (
-                'Sign In'
+                mode === 'signin' ? 'Sign In' : 'Create Account'
               )}
             </button>
           </form>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess(''); }}
+              className="text-sm text-navy/50 hover:text-gold transition-colors"
+            >
+              {mode === 'signin' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}
+            </button>
+          </div>
         </div>
 
         {/* Footer */}
