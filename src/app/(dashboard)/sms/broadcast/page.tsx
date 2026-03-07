@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { SmsTemplate, Contact } from '@/types';
 import Button from '@/components/ui/Button';
-import { ArrowLeft, Send, Users } from 'lucide-react';
+import { Send, Users, MessageSquare, FileText, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SmsBroadcastPage() {
@@ -101,23 +101,41 @@ export default function SmsBroadcastPage() {
     setSending(false);
   };
 
-  return (
-    <div>
-      <Link
-        href="/sms/conversations"
-        className="inline-flex items-center gap-1 text-sm text-navy/60 hover:text-navy transition-colors mb-4"
-      >
-        <ArrowLeft size={16} />
-        Back to Conversations
-      </Link>
+  const charCount = body.length;
+  const segments = Math.ceil(charCount / 160) || 1;
+  const mergeFields = ['{{first_name}}', '{{last_name}}'];
 
-      <h1 className="text-2xl font-serif text-navy mb-6">SMS Broadcast</h1>
+  return (
+    <div className="animate-fade-in">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Send size={20} className="text-gold" />
+            <h1 className="text-2xl font-serif text-navy">SMS Broadcast</h1>
+          </div>
+          <p className="text-sm text-navy/50">Send a text message to multiple contacts at once</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/sms/conversations">
+            <Button variant="outline" size="sm">
+              <MessageSquare size={14} />
+              Conversations
+            </Button>
+          </Link>
+          <Link href="/sms/templates">
+            <Button variant="outline" size="sm">
+              <FileText size={14} />
+              Templates
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {step === 'compose' && (
-        <div className="space-y-6">
+        <div className="max-w-2xl space-y-5">
           {/* Template selector */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <label className="block text-sm font-medium text-navy mb-2">
+          <div className="card p-5">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
               Start from a template (optional)
             </label>
             <select
@@ -125,7 +143,7 @@ export default function SmsBroadcastPage() {
                 const t = templates.find((t) => t.id === e.target.value);
                 if (t) setBody(t.body || '');
               }}
-              className="w-full px-3 py-2 border border-cream-dark rounded-lg text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold"
+              className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
             >
               <option value="">Write from scratch</option>
               {templates.map((t) => (
@@ -135,101 +153,135 @@ export default function SmsBroadcastPage() {
           </div>
 
           {/* Message body */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <label className="block text-sm font-medium text-navy mb-2">Message</label>
+          <div className="card p-5">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
+              Message
+            </label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-cream-dark rounded-lg text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold resize-none"
+              rows={5}
+              className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold resize-none transition-all"
               placeholder="Hi {{first_name}}, ..."
             />
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex gap-1">
-                {['first_name', 'last_name'].map((field) => (
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-1.5">
+                {mergeFields.map((field) => (
                   <button
                     key={field}
-                    type="button"
-                    onClick={() => setBody(body + `{{${field}}}`)}
-                    className="px-2 py-0.5 text-xs bg-gold/10 text-gold-dark rounded hover:bg-gold/20 transition-colors"
+                    onClick={() => setBody(body + field)}
+                    className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-gold/10 text-gold-dark hover:bg-gold/20 transition-colors"
                   >
-                    {`{{${field}}}`}
+                    {field}
                   </button>
                 ))}
               </div>
-              <span className="text-xs text-navy/40">
-                {body.length} chars &middot; {Math.ceil(body.length / 160) || 1} segment{Math.ceil(body.length / 160) !== 1 ? 's' : ''}
+              <span className="text-[10px] text-navy/35">
+                {charCount} chars &middot; {segments} segment{segments !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
 
           {/* Tag filter */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <label className="block text-sm font-medium text-navy mb-2">
+          <div className="card p-5">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
               Filter by Tags (optional)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {allTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    selectedTags.includes(tag)
-                      ? 'bg-gold text-white'
-                      : 'bg-cream-dark text-navy hover:bg-cream-dark/80'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+            {allTags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      selectedTags.includes(tag)
+                        ? 'bg-gold text-white shadow-sm'
+                        : 'bg-cream-dark text-navy/60 hover:bg-cream-dark/80 hover:text-navy'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-navy/35">No tags found. All active contacts with phone numbers will be included.</p>
+            )}
           </div>
 
           {/* Matching contacts */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <div className="flex items-center gap-2">
-              <Users size={16} className="text-navy/60" />
-              <span className="text-sm font-medium text-navy">
-                {matchingContacts.length} contacts with phone numbers
-              </span>
+          <div className="card p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Users size={14} className="text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-navy">
+                    {matchingContacts.length} recipient{matchingContacts.length !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-[10px] text-navy/40">Active contacts with phone numbers</p>
+                </div>
+              </div>
+              {body.trim() && matchingContacts.length > 0 && (
+                <span className="text-[10px] text-navy/35">
+                  ~{segments * matchingContacts.length} total segment{segments * matchingContacts.length !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-2">
             <Button
               onClick={handleSend}
               disabled={!body.trim() || matchingContacts.length === 0}
               loading={sending}
             >
               <Send size={14} />
-              Send to {matchingContacts.length} Contacts
+              Send to {matchingContacts.length} Contact{matchingContacts.length !== 1 ? 's' : ''}
             </Button>
           </div>
         </div>
       )}
 
       {step === 'sending' && (
-        <div className="bg-white rounded-xl border border-cream-dark p-8 text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-gold border-t-transparent rounded-full mx-auto mb-4" />
+        <div className="max-w-md mx-auto card p-10 text-center">
+          <div className="w-12 h-12 mx-auto mb-4">
+            <div className="w-12 h-12 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+          </div>
           <h3 className="text-lg font-serif text-navy mb-2">Sending SMS Broadcast...</h3>
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/50">
             {progress.sent} of {progress.total} messages sent
           </p>
+          <div className="mt-4 w-full bg-cream-dark rounded-full h-1.5 overflow-hidden">
+            <div
+              className="bg-gold h-full rounded-full transition-all duration-500"
+              style={{ width: `${progress.total > 0 ? (progress.sent / progress.total) * 100 : 0}%` }}
+            />
+          </div>
         </div>
       )}
 
       {step === 'done' && (
-        <div className="bg-white rounded-xl border border-cream-dark p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl text-green-600">&#10003;</span>
+        <div className="max-w-md mx-auto card p-10 text-center">
+          <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-green-500" />
           </div>
           <h3 className="text-lg font-serif text-navy mb-2">Broadcast Sent!</h3>
-          <p className="text-sm text-navy/60 mb-4">
-            Successfully sent {progress.sent} SMS messages.
+          <p className="text-sm text-navy/50 mb-6">
+            Successfully sent {progress.sent} of {progress.total} SMS messages.
           </p>
-          <Link href="/sms/conversations">
-            <Button>View Conversations</Button>
-          </Link>
+          <div className="flex items-center justify-center gap-2">
+            <Link href="/sms/conversations">
+              <Button variant="outline" size="sm">
+                <MessageSquare size={14} />
+                View Conversations
+              </Button>
+            </Link>
+            <Button size="sm" onClick={() => { setStep('compose'); setBody(''); setSelectedTags([]); }}>
+              <Send size={14} />
+              Send Another
+            </Button>
+          </div>
         </div>
       )}
     </div>

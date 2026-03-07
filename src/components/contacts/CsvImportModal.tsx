@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-browser';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Papa from 'papaparse';
-import { Upload } from 'lucide-react';
+import { Upload, CheckCircle, FileSpreadsheet } from 'lucide-react';
 
 interface CsvImportModalProps {
   open: boolean;
@@ -38,7 +38,6 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
         setCsvData(results.data);
         setCsvHeaders(results.meta.fields || []);
 
-        // Auto-map matching headers
         const autoMap: Record<string, string> = {};
         (results.meta.fields || []).forEach((header) => {
           const normalized = header.toLowerCase().replace(/[\s-]/g, '_');
@@ -72,10 +71,8 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
         : [],
       source: 'csv_import',
       status: 'active' as const,
-      org_id: 1,
     }));
 
-    // Batch insert in chunks of 100
     let imported = 0;
     for (let i = 0; i < contacts.length; i += 100) {
       const batch = contacts.slice(i, i + 100);
@@ -112,12 +109,13 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
   return (
     <Modal open={open} onClose={handleClose} title="Import Contacts from CSV" size="lg">
       {step === 'upload' && (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-full bg-cream-dark flex items-center justify-center mx-auto mb-4">
-            <Upload size={28} className="text-navy/40" />
+        <div className="text-center py-10">
+          <div className="w-16 h-16 rounded-2xl bg-cream-dark flex items-center justify-center mx-auto mb-4">
+            <Upload size={28} className="text-navy/30" />
           </div>
-          <p className="text-sm text-navy/60 mb-4">
-            Upload a CSV file with contact information. You&apos;ll be able to map columns in the next step.
+          <h3 className="text-sm font-medium text-navy mb-1">Upload a CSV file</h3>
+          <p className="text-xs text-navy/40 mb-5 max-w-xs mx-auto">
+            You&apos;ll be able to map columns to contact fields in the next step.
           </p>
           <input
             ref={fileRef}
@@ -126,8 +124,8 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
             onChange={handleFileChange}
             className="hidden"
           />
-          <Button onClick={() => fileRef.current?.click()}>
-            <Upload size={14} />
+          <Button size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload size={13} />
             Choose CSV File
           </Button>
         </div>
@@ -135,13 +133,16 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
 
       {step === 'map' && (
         <div>
-          <p className="text-sm text-navy/60 mb-4">
-            Found {csvData.length} rows. Map your CSV columns to contact fields:
-          </p>
+          <div className="flex items-center gap-2 mb-5 px-3 py-2 bg-cream/50 rounded-xl">
+            <FileSpreadsheet size={14} className="text-gold" />
+            <span className="text-xs text-navy/60">
+              Found <strong className="text-navy">{csvData.length}</strong> rows. Map your CSV columns to contact fields:
+            </span>
+          </div>
           <div className="space-y-3 mb-6">
             {CONTACT_FIELDS.map((field) => (
               <div key={field} className="flex items-center gap-4">
-                <label className="w-32 text-sm font-medium text-navy capitalize">
+                <label className="w-28 text-xs font-semibold text-navy/50 uppercase tracking-wider">
                   {field.replace('_', ' ')}
                 </label>
                 <select
@@ -149,9 +150,9 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
                   onChange={(e) =>
                     setMapping({ ...mapping, [field]: e.target.value })
                   }
-                  className="flex-1 px-3 py-2 border border-cream-dark rounded-lg text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold"
+                  className="flex-1 px-3 py-2 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
                 >
-                  <option value="">— Skip —</option>
+                  <option value="">-- Skip --</option>
                   {csvHeaders.map((h) => (
                     <option key={h} value={h}>{h}</option>
                   ))}
@@ -161,14 +162,14 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
           </div>
 
           {/* Preview first 3 rows */}
-          <div className="bg-cream rounded-lg p-3 mb-4">
-            <p className="text-xs font-medium text-navy/60 mb-2">Preview (first 3 rows):</p>
+          <div className="bg-cream/50 rounded-xl p-4 mb-5 border border-cream-dark/50">
+            <p className="text-[10px] font-semibold text-navy/40 uppercase tracking-wider mb-2">Preview (first 3 rows)</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr>
                     {CONTACT_FIELDS.filter((f) => mapping[f]).map((f) => (
-                      <th key={f} className="text-left px-2 py-1 text-navy/60 capitalize">
+                      <th key={f} className="text-left px-2 py-1.5 text-navy/50 font-semibold uppercase tracking-wider text-[10px]">
                         {f.replace('_', ' ')}
                       </th>
                     ))}
@@ -176,10 +177,10 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
                 </thead>
                 <tbody>
                   {csvData.slice(0, 3).map((row, i) => (
-                    <tr key={i}>
+                    <tr key={i} className="border-t border-cream-dark/30">
                       {CONTACT_FIELDS.filter((f) => mapping[f]).map((f) => (
-                        <td key={f} className="px-2 py-1 text-navy">
-                          {row[mapping[f]] || '—'}
+                        <td key={f} className="px-2 py-1.5 text-navy text-xs">
+                          {row[mapping[f]] || <span className="text-navy/20">--</span>}
                         </td>
                       ))}
                     </tr>
@@ -189,9 +190,10 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button onClick={handleImport} loading={loading}>
+          <div className="flex justify-end gap-2 pt-3 border-t border-cream-dark">
+            <Button variant="outline" size="sm" onClick={handleClose}>Cancel</Button>
+            <Button size="sm" onClick={handleImport} loading={loading}>
+              <Upload size={13} />
               Import {csvData.length} Contacts
             </Button>
           </div>
@@ -199,12 +201,12 @@ export default function CsvImportModal({ open, onClose, onSuccess }: CsvImportMo
       )}
 
       {step === 'preview' && (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">&#10003;</span>
+        <div className="text-center py-10">
+          <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-green-500" />
           </div>
-          <h3 className="text-lg font-serif text-navy mb-2">Import Complete</h3>
-          <p className="text-sm text-navy/60">
+          <h3 className="text-base font-serif text-navy mb-1">Import Complete</h3>
+          <p className="text-sm text-navy/50">
             Successfully imported {importCount} contacts.
           </p>
         </div>

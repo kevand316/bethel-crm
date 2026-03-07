@@ -6,8 +6,19 @@ import { createClient } from '@/lib/supabase-browser';
 import { Contact, SmsMessage, SmsTemplate } from '@/types';
 import { formatDateTime, formatPhone, getInitials } from '@/lib/utils';
 import Button from '@/components/ui/Button';
-import { ArrowLeft, Send, FileText } from 'lucide-react';
+import { ArrowLeft, Send, FileText, MessageSquare, User } from 'lucide-react';
 import Link from 'next/link';
+
+function MessageSkeleton() {
+  return (
+    <div className="space-y-3 py-4">
+      <div className="flex justify-start"><div className="skeleton w-48 h-10 rounded-2xl rounded-bl-md" /></div>
+      <div className="flex justify-end"><div className="skeleton w-56 h-10 rounded-2xl rounded-br-md" /></div>
+      <div className="flex justify-start"><div className="skeleton w-40 h-10 rounded-2xl rounded-bl-md" /></div>
+      <div className="flex justify-end"><div className="skeleton w-64 h-10 rounded-2xl rounded-br-md" /></div>
+    </div>
+  );
+}
 
 export default function SmsConversationPage() {
   const params = useParams();
@@ -122,82 +133,106 @@ export default function SmsConversationPage() {
     setShowTemplates(false);
   };
 
-  if (loading) {
-    return <div className="text-center py-12 text-navy/40">Loading conversation...</div>;
-  }
-
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)]">
+    <div className="flex flex-col h-[calc(100vh-6rem)] animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b border-cream-dark">
         <Link
           href="/sms/conversations"
-          className="p-1.5 rounded-lg hover:bg-cream-dark transition-colors"
+          className="p-1.5 rounded-lg hover:bg-cream-dark transition-colors text-navy/50 hover:text-navy"
         >
           <ArrowLeft size={18} />
         </Link>
-        {contact && (
+        {contact ? (
           <>
-            <div className="w-10 h-10 rounded-full bg-navy/10 flex items-center justify-center text-sm font-medium text-navy">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy/10 to-navy/5 flex items-center justify-center text-xs font-semibold text-navy/60 ring-1 ring-navy/5">
               {getInitials(contact.first_name, contact.last_name)}
             </div>
             <div>
               <h2 className="font-medium text-navy text-sm">
                 {contact.first_name} {contact.last_name}
               </h2>
-              <p className="text-xs text-navy/50">{formatPhone(contact.phone)}</p>
+              <p className="text-xs text-navy/40">{formatPhone(contact.phone)}</p>
             </div>
           </>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="skeleton w-10 h-10 rounded-full" />
+            <div>
+              <div className="skeleton w-24 h-4 mb-1" />
+              <div className="skeleton w-20 h-3" />
+            </div>
+          </div>
         )}
         <div className="ml-auto">
           <Link href={`/contacts/${contactId}`}>
-            <Button variant="outline" size="sm">View Contact</Button>
+            <Button variant="outline" size="sm">
+              <User size={13} />
+              View Contact
+            </Button>
           </Link>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-3">
-        {messages.length === 0 ? (
-          <div className="text-center text-navy/40 text-sm py-12">
-            No messages yet. Send the first one!
+      <div className="flex-1 overflow-y-auto py-4 space-y-2 px-2">
+        {loading ? (
+          <MessageSkeleton />
+        ) : messages.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-12 h-12 rounded-full bg-cream-dark flex items-center justify-center mx-auto mb-3">
+              <MessageSquare size={20} className="text-navy/25" />
+            </div>
+            <p className="text-sm text-navy/40 mb-1">No messages yet</p>
+            <p className="text-xs text-navy/30">Send the first message to start the conversation.</p>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                  msg.direction === 'outbound'
-                    ? 'bg-navy text-white rounded-br-md'
-                    : 'bg-white border border-cream-dark text-navy rounded-bl-md'
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
-                <p
-                  className={`text-xs mt-1 ${
-                    msg.direction === 'outbound' ? 'text-white/50' : 'text-navy/40'
-                  }`}
-                >
-                  {formatDateTime(msg.created_at)}
-                </p>
+          messages.map((msg, i) => {
+            const isOutbound = msg.direction === 'outbound';
+            const prevMsg = i > 0 ? messages[i - 1] : null;
+            const showTimestamp = !prevMsg ||
+              new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() > 300000; // 5 min gap
+
+            return (
+              <div key={msg.id}>
+                {showTimestamp && (
+                  <div className="text-center my-3">
+                    <span className="text-[10px] text-navy/30 bg-cream px-2 py-0.5 rounded-full">
+                      {formatDateTime(msg.created_at)}
+                    </span>
+                  </div>
+                )}
+                <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                      isOutbound
+                        ? 'bg-navy text-white rounded-br-md'
+                        : 'bg-white border border-cream-dark text-navy rounded-bl-md'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                    {msg.status && msg.status !== 'delivered' && msg.status !== 'received' && (
+                      <p className={`text-[10px] mt-1 ${isOutbound ? 'text-white/40' : 'text-navy/30'}`}>
+                        {msg.status}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Template selector */}
       {showTemplates && (
-        <div className="bg-white border border-cream-dark rounded-xl p-3 mb-2 max-h-48 overflow-y-auto">
-          <p className="text-xs font-medium text-navy/60 mb-2">Select a template:</p>
+        <div className="card p-3 mb-2 max-h-48 overflow-y-auto animate-fade-in">
+          <p className="text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">Select a template</p>
           {templates.length === 0 ? (
-            <p className="text-xs text-navy/40">No templates available</p>
+            <p className="text-xs text-navy/40 py-2">No templates available. <Link href="/sms/templates" className="text-gold-dark hover:underline">Create one</Link></p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {templates.map((t) => (
                 <button
                   key={t.id}
@@ -205,7 +240,7 @@ export default function SmsConversationPage() {
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-cream transition-colors"
                 >
                   <p className="text-sm font-medium text-navy">{t.name}</p>
-                  <p className="text-xs text-navy/50 truncate">{t.body}</p>
+                  <p className="text-xs text-navy/40 truncate">{t.body}</p>
                 </button>
               ))}
             </div>
@@ -217,7 +252,11 @@ export default function SmsConversationPage() {
       <div className="flex items-end gap-2 pt-3 border-t border-cream-dark">
         <button
           onClick={() => setShowTemplates(!showTemplates)}
-          className="p-2.5 rounded-lg hover:bg-cream-dark transition-colors text-navy/50 hover:text-navy shrink-0"
+          className={`p-2.5 rounded-xl transition-all shrink-0 ${
+            showTemplates
+              ? 'bg-gold/10 text-gold-dark'
+              : 'hover:bg-cream-dark text-navy/40 hover:text-navy'
+          }`}
           title="Use template"
         >
           <FileText size={18} />
@@ -234,7 +273,7 @@ export default function SmsConversationPage() {
           placeholder={contact?.phone ? 'Type a message...' : 'Contact has no phone number'}
           disabled={!contact?.phone}
           rows={1}
-          className="flex-1 px-4 py-2.5 border border-cream-dark rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold resize-none disabled:opacity-50"
+          className="flex-1 px-4 py-2.5 border border-cream-dark rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold resize-none disabled:opacity-50 transition-all placeholder-navy/30"
         />
         <Button
           onClick={handleSend}

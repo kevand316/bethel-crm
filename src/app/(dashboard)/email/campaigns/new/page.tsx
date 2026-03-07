@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import { EmailTemplate, Contact } from '@/types';
 import { mergeTags } from '@/lib/utils';
 import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
-import { ArrowLeft, Send, Users, Eye } from 'lucide-react';
+import { ArrowLeft, Send, Users, Eye, Edit2, CheckCircle, Mail } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewCampaignPage() {
@@ -51,7 +50,6 @@ export default function NewCampaignPage() {
       .not('email', 'is', null);
 
     if (selectedTags.length > 0) {
-      // Filter contacts that have ALL selected tags
       for (const tag of selectedTags) {
         query = query.contains('tags', JSON.stringify([tag]));
       }
@@ -83,7 +81,6 @@ export default function NewCampaignPage() {
     setLoading(true);
     setStep('sending');
 
-    // Create campaign
     const { data: campaign, error: campaignError } = await supabase
       .from('email_campaigns')
       .insert({
@@ -91,7 +88,6 @@ export default function NewCampaignPage() {
         template_id: templateId,
         filter_tags: selectedTags.length > 0 ? selectedTags : null,
         status: 'sending',
-        org_id: 1,
       })
       .select()
       .single();
@@ -105,7 +101,6 @@ export default function NewCampaignPage() {
 
     setSendProgress({ sent: 0, total: matchingContacts.length });
 
-    // Send emails in batches via API route
     const batchSize = 10;
     let totalSent = 0;
     let totalFailed = 0;
@@ -138,13 +133,11 @@ export default function NewCampaignPage() {
 
       setSendProgress({ sent: totalSent + totalFailed, total: matchingContacts.length });
 
-      // Stagger between batches (1 second delay)
       if (i + batchSize < matchingContacts.length) {
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
-    // Update campaign stats
     await supabase
       .from('email_campaigns')
       .update({
@@ -159,38 +152,45 @@ export default function NewCampaignPage() {
   };
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <Link
         href="/email/campaigns"
-        className="inline-flex items-center gap-1 text-sm text-navy/60 hover:text-navy transition-colors mb-4"
+        className="inline-flex items-center gap-1 text-xs text-navy/40 hover:text-navy transition-colors mb-4"
       >
-        <ArrowLeft size={16} />
+        <ArrowLeft size={14} />
         Back to Campaigns
       </Link>
 
-      <h1 className="text-2xl font-serif text-navy mb-6">New Email Campaign</h1>
+      <div className="flex items-center gap-2 mb-6">
+        <Mail size={20} className="text-gold" />
+        <h1 className="text-2xl font-serif text-navy">New Email Campaign</h1>
+      </div>
 
       {step === 'setup' && (
-        <div className="space-y-6">
+        <div className="max-w-2xl space-y-5">
           {/* Campaign Name */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <label className="block text-sm font-medium text-navy mb-2">Campaign Name</label>
+          <div className="card p-5">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
+              Campaign Name
+            </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-cream-dark rounded-lg text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold"
+              className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
               placeholder="e.g., March Newsletter"
             />
           </div>
 
           {/* Template Selection */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <label className="block text-sm font-medium text-navy mb-2">Email Template</label>
+          <div className="card p-5">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
+              Email Template
+            </label>
             {templates.length === 0 ? (
-              <div className="text-sm text-navy/60">
+              <div className="text-sm text-navy/40">
                 No templates yet.{' '}
-                <Link href="/email/templates/new" className="text-gold-dark underline">
+                <Link href="/email/templates/new" className="text-gold-dark hover:underline">
                   Create one first
                 </Link>
               </div>
@@ -198,12 +198,12 @@ export default function NewCampaignPage() {
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                className="w-full px-3 py-2 border border-cream-dark rounded-lg text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold"
+                className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
               >
                 <option value="">Select a template...</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} — {t.subject || '(no subject)'}
+                    {t.name} -- {t.subject || '(no subject)'}
                   </option>
                 ))}
               </select>
@@ -211,104 +211,116 @@ export default function NewCampaignPage() {
           </div>
 
           {/* Tag Filter */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <label className="block text-sm font-medium text-navy mb-2">
-              Filter by Tags (optional — leave empty to send to all active contacts)
+          <div className="card p-5">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
+              Filter by Tags (optional)
             </label>
-            <div className="flex flex-wrap gap-2">
-              {allTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    selectedTags.includes(tag)
-                      ? 'bg-gold text-white'
-                      : 'bg-cream-dark text-navy hover:bg-cream-dark/80'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-              {allTags.length === 0 && (
-                <span className="text-sm text-navy/40">No tags found</span>
-              )}
-            </div>
+            <p className="text-[10px] text-navy/35 mb-3">Leave empty to send to all active contacts with email addresses.</p>
+            {allTags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      selectedTags.includes(tag)
+                        ? 'bg-gold text-white shadow-sm'
+                        : 'bg-cream-dark text-navy/60 hover:bg-cream-dark/80 hover:text-navy'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-navy/35">No tags found.</p>
+            )}
           </div>
 
           {/* Matching Contacts */}
-          <div className="bg-white rounded-xl border border-cream-dark p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Users size={16} className="text-navy/60" />
-              <span className="text-sm font-medium text-navy">
-                {matchingContacts.length} matching contacts
-              </span>
+          <div className="card p-5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Users size={14} className="text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-navy">
+                  {matchingContacts.length} recipient{matchingContacts.length !== 1 ? 's' : ''}
+                </p>
+                <p className="text-[10px] text-navy/40">
+                  Active contacts with email. Unsubscribed and bounced excluded.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-navy/50">
-              Only active contacts with email addresses will receive this campaign.
-              Unsubscribed and bounced contacts are automatically excluded.
-            </p>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 if (templateId) setStep('preview');
               }}
               disabled={!templateId}
             >
-              <Eye size={14} />
+              <Eye size={13} />
               Preview
             </Button>
             <Button
+              size="sm"
               onClick={handleSend}
               disabled={!templateId || !name.trim() || matchingContacts.length === 0}
               loading={loading}
             >
-              <Send size={14} />
-              Send to {matchingContacts.length} Contacts
+              <Send size={13} />
+              Send to {matchingContacts.length} Contact{matchingContacts.length !== 1 ? 's' : ''}
             </Button>
           </div>
         </div>
       )}
 
       {step === 'preview' && selectedTemplate && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-cream-dark p-6">
-            <h3 className="text-sm font-medium text-navy/60 mb-1">Subject</h3>
-            <p className="text-navy mb-4">
-              {mergeTags(selectedTemplate.subject || '', {
-                first_name: 'John',
-                last_name: 'Smith',
-                email: 'john@example.com',
-              })}
-            </p>
-            <h3 className="text-sm font-medium text-navy/60 mb-1">Body Preview</h3>
-            <div
-              className="prose prose-sm max-w-none border border-cream-dark rounded-lg p-4"
-              dangerouslySetInnerHTML={{
-                __html: mergeTags(selectedTemplate.html_body || '', {
-                  first_name: 'John',
-                  last_name: 'Smith',
-                  email: 'john@example.com',
-                }),
-              }}
-            />
-            <p className="text-xs text-navy/40 mt-4">
-              * Preview uses sample data. Actual emails will use each contact&apos;s real information.
-            </p>
+        <div className="max-w-2xl space-y-5">
+          <div className="card p-8">
+            <div className="max-w-xl mx-auto">
+              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-cream-dark">
+                <span className="text-xs font-semibold text-navy/40 uppercase tracking-wider">Subject:</span>
+                <span className="text-sm text-navy">
+                  {mergeTags(selectedTemplate.subject || '', {
+                    first_name: 'John',
+                    last_name: 'Smith',
+                    email: 'john@example.com',
+                  })}
+                </span>
+              </div>
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: mergeTags(selectedTemplate.html_body || '', {
+                    first_name: 'John',
+                    last_name: 'Smith',
+                    email: 'john@example.com',
+                  }),
+                }}
+              />
+              <p className="text-[10px] text-navy/30 mt-6 pt-4 border-t border-cream-dark">
+                * Preview uses sample data. Actual emails will use each contact&apos;s real information.
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setStep('setup')}>
+            <Button variant="outline" size="sm" onClick={() => setStep('setup')}>
+              <Edit2 size={13} />
               Back to Setup
             </Button>
             <Button
+              size="sm"
               onClick={handleSend}
               disabled={matchingContacts.length === 0}
               loading={loading}
             >
-              <Send size={14} />
+              <Send size={13} />
               Send Campaign
             </Button>
           </div>
@@ -316,15 +328,17 @@ export default function NewCampaignPage() {
       )}
 
       {step === 'sending' && (
-        <div className="bg-white rounded-xl border border-cream-dark p-8 text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-gold border-t-transparent rounded-full mx-auto mb-4" />
+        <div className="max-w-md mx-auto card p-10 text-center">
+          <div className="w-12 h-12 mx-auto mb-4">
+            <div className="w-12 h-12 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+          </div>
           <h3 className="text-lg font-serif text-navy mb-2">Sending Campaign...</h3>
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-navy/50">
             {sendProgress.sent} of {sendProgress.total} emails processed
           </p>
-          <div className="w-full max-w-xs mx-auto mt-4 h-2 bg-cream-dark rounded-full overflow-hidden">
+          <div className="mt-4 w-full bg-cream-dark rounded-full h-1.5 overflow-hidden">
             <div
-              className="h-full bg-gold rounded-full transition-all duration-300"
+              className="bg-gold h-full rounded-full transition-all duration-500"
               style={{
                 width: `${sendProgress.total > 0 ? (sendProgress.sent / sendProgress.total) * 100 : 0}%`,
               }}
@@ -334,16 +348,19 @@ export default function NewCampaignPage() {
       )}
 
       {step === 'done' && (
-        <div className="bg-white rounded-xl border border-cream-dark p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl text-green-600">&#10003;</span>
+        <div className="max-w-md mx-auto card p-10 text-center">
+          <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-green-500" />
           </div>
           <h3 className="text-lg font-serif text-navy mb-2">Campaign Sent!</h3>
-          <p className="text-sm text-navy/60 mb-4">
-            Successfully sent {sendProgress.sent} emails.
+          <p className="text-sm text-navy/50 mb-6">
+            Successfully sent {sendProgress.sent} of {sendProgress.total} emails.
           </p>
           <Link href="/email/campaigns">
-            <Button>View Campaigns</Button>
+            <Button size="sm">
+              <Mail size={13} />
+              View Campaigns
+            </Button>
           </Link>
         </div>
       )}

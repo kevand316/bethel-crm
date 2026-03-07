@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import EmailEditor from '@/components/email/EmailEditor';
-import { ArrowLeft, Eye } from 'lucide-react';
+import { ArrowLeft, Eye, Edit2, Save } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewEmailTemplatePage() {
@@ -25,7 +25,6 @@ export default function NewEmailTemplatePage() {
       name: name.trim(),
       subject: subject.trim() || null,
       html_body: htmlBody,
-      org_id: 1,
     });
 
     if (!error) {
@@ -35,12 +34,12 @@ export default function NewEmailTemplatePage() {
   };
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <Link
         href="/email/templates"
-        className="inline-flex items-center gap-1 text-sm text-navy/60 hover:text-navy transition-colors mb-4"
+        className="inline-flex items-center gap-1 text-xs text-navy/40 hover:text-navy transition-colors mb-4"
       >
-        <ArrowLeft size={16} />
+        <ArrowLeft size={14} />
         Back to Templates
       </Link>
 
@@ -52,19 +51,23 @@ export default function NewEmailTemplatePage() {
             size="sm"
             onClick={() => setShowPreview(!showPreview)}
           >
-            <Eye size={14} />
+            {showPreview ? <Edit2 size={13} /> : <Eye size={13} />}
             {showPreview ? 'Edit' : 'Preview'}
           </Button>
           <Button size="sm" onClick={handleSave} loading={loading}>
+            <Save size={13} />
             Save Template
           </Button>
         </div>
       </div>
 
       {showPreview ? (
-        <div className="bg-white rounded-xl border border-cream-dark p-6">
+        <div className="card p-8">
           <div className="max-w-xl mx-auto">
-            <p className="text-sm text-navy/60 mb-2">Subject: {subject || '(no subject)'}</p>
+            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-cream-dark">
+              <span className="text-xs font-semibold text-navy/40 uppercase tracking-wider">Subject:</span>
+              <span className="text-sm text-navy">{subject || '(no subject)'}</span>
+            </div>
             <div
               className="prose prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: htmlBody || '<p class="text-navy/40">No content yet</p>' }}
@@ -72,32 +75,38 @@ export default function NewEmailTemplatePage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Template Name</label>
+              <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-1.5">
+                Template Name
+              </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-cream-dark rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold"
+                className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
                 placeholder="e.g., Welcome Email"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Subject Line</label>
+              <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-1.5">
+                Subject Line
+              </label>
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3 py-2 border border-cream-dark rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold"
+                className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
                 placeholder="e.g., Welcome to Bethel Residency, {{first_name}}!"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-navy mb-1">Email Body</label>
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-1.5">
+              Email Body
+            </label>
             <EmailEditor
               content={htmlBody}
               onChange={setHtmlBody}
