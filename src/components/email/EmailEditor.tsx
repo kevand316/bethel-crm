@@ -28,6 +28,7 @@ interface EmailEditorProps {
 
 export default function EmailEditor({ content, onChange, placeholder }: EmailEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Underline,
