@@ -394,32 +394,41 @@ export default function SettingsPage() {
             </Button>
           </form>
 
-          {/* Test email */}
-          <div className="mt-5 pt-5 border-t border-cream-dark/50">
-            <p className="text-xs font-semibold text-navy/50 uppercase tracking-wider mb-3">Send Test Email</p>
-            <form onSubmit={handleTestEmail} className="flex gap-2">
-              <input
-                type="email"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="flex-1 px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
-              />
-              <Button type="submit" size="sm" loading={testLoading} disabled={!testEmail.trim()}>
-                <Send size={13} />
-                Test
-              </Button>
-            </form>
-            {testResult && (
-              <div className={`mt-2 px-3 py-2.5 rounded-xl text-xs ${
-                testResult.success
-                  ? 'bg-green-50 text-green-700 border border-green-200'
-                  : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>
-                {testResult.message}
-              </div>
-            )}
+        </div>
+
+        {/* Test Email */}
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+              <Send size={14} className="text-green-500" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-navy">Send Test Email</h2>
+              <p className="text-xs text-navy/40">Verify your Resend integration is working</p>
+            </div>
           </div>
+          <form onSubmit={handleTestEmail} className="flex gap-2">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="Enter recipient email..."
+              className="flex-1 px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
+            />
+            <Button type="submit" size="sm" loading={testLoading} disabled={!testEmail.trim()}>
+              <Send size={13} />
+              Send Test
+            </Button>
+          </form>
+          {testResult && (
+            <div className={`mt-3 px-3 py-2.5 rounded-xl text-xs ${
+              testResult.success
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              {testResult.message}
+            </div>
+          )}
         </div>
 
         {/* Webhook URLs */}
