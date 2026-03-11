@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [integrationStatus, setIntegrationStatus] = useState<{ resend: string; twilio: string } | null>(null);
 
   // Sender management
   const [senders, setSenders] = useState<{ id: string; name: string; email: string; is_default: boolean }[]>([]);
@@ -29,6 +30,7 @@ export default function SettingsPage() {
     };
     getUser();
     fetchSenders();
+    fetch('/api/settings/status').then((r) => r.json()).then(setIntegrationStatus);
   }, [supabase]);
 
   const fetchSenders = async () => {
@@ -219,34 +221,42 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-0">
             {[
-              { name: 'Supabase', desc: 'Database & Authentication', icon: Database, status: 'connected' },
-              { name: 'Resend', desc: 'Email sending & tracking', icon: Mail, status: 'env' },
-              { name: 'Twilio', desc: 'SMS send & receive', icon: MessageSquare, status: 'env' },
-            ].map((integration, i) => (
-              <div
-                key={integration.name}
-                className={`flex items-center justify-between py-3.5 ${
-                  i < 2 ? 'border-b border-cream-dark/50' : ''
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-cream-dark/50 flex items-center justify-center">
-                    <integration.icon size={14} className="text-navy/50" />
+              { name: 'Supabase', desc: 'Database & Authentication', icon: Database, key: 'supabase' },
+              { name: 'Resend', desc: 'Email sending & tracking', icon: Mail, key: 'resend' },
+              { name: 'Twilio', desc: 'SMS send & receive', icon: MessageSquare, key: 'twilio' },
+            ].map((integration, i) => {
+              const status = integration.key === 'supabase'
+                ? 'connected'
+                : integrationStatus?.[integration.key as 'resend' | 'twilio'];
+
+              return (
+                <div
+                  key={integration.name}
+                  className={`flex items-center justify-between py-3.5 ${i < 2 ? 'border-b border-cream-dark/50' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-cream-dark/50 flex items-center justify-center">
+                      <integration.icon size={14} className="text-navy/50" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-navy">{integration.name}</p>
+                      <p className="text-xs text-navy/40">{integration.desc}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-navy">{integration.name}</p>
-                    <p className="text-xs text-navy/40">{integration.desc}</p>
-                  </div>
+                  {!status ? (
+                    <div className="skeleton w-16 h-5 rounded-full" />
+                  ) : status === 'connected' ? (
+                    <Badge variant="green">Connected</Badge>
+                  ) : status === 'invalid_key' ? (
+                    <Badge variant="red">Invalid Key</Badge>
+                  ) : status === 'missing' ? (
+                    <Badge variant="gray">Not Configured</Badge>
+                  ) : (
+                    <Badge variant="gray">Unreachable</Badge>
+                  )}
                 </div>
-                {integration.status === 'connected' ? (
-                  <Badge variant="green">Connected</Badge>
-                ) : (
-                  <span className="px-2.5 py-1 text-[10px] font-medium rounded-full bg-cream-dark text-navy/50">
-                    Configure in .env
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
