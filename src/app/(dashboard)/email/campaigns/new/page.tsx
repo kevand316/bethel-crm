@@ -28,7 +28,7 @@ export default function NewCampaignPage() {
 
   const [name, setName] = useState('');
   const [templateId, setTemplateId] = useState('');
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>('all');
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('specific');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState('');
@@ -297,7 +297,38 @@ export default function NewCampaignPage() {
 
             {/* Specific contacts */}
             {audienceMode === 'specific' && (
-              <div className="animate-fade-in space-y-2">
+              <div className="animate-fade-in space-y-3">
+                {/* Tag shortcuts */}
+                {allTags.length > 0 && (
+                  <div>
+                    <p className="text-xs text-navy/40 mb-2">Quick-select by tag:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allTags.map((tag) => {
+                        const tagContacts = allContacts.filter(
+                          (c) => Array.isArray(c.tags) && c.tags.includes(tag)
+                        );
+                        return (
+                          <button
+                            key={tag}
+                            onClick={() => {
+                              const ids = tagContacts.map((c) => c.id);
+                              setSelectedContactIds((prev) => {
+                                const next = new Set(prev);
+                                ids.forEach((id) => next.add(id));
+                                return next;
+                              });
+                            }}
+                            className="px-2.5 py-1 rounded-full text-xs font-medium bg-cream-dark text-navy/60 hover:bg-gold/10 hover:text-gold-dark transition-all border border-transparent hover:border-gold/20"
+                          >
+                            {tag} ({tagContacts.length})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Search */}
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy/30" />
                   <input
