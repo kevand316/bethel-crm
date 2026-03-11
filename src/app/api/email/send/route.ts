@@ -12,6 +12,13 @@ interface ContactPayload {
 export async function POST(request: Request) {
   try {
     const { campaign_id, template_id, contacts, from_email, from_name } = await request.json();
+
+    // Startup diagnostics
+    console.log('[email/send] RESEND_API_KEY set:', !!process.env.RESEND_API_KEY);
+    console.log('[email/send] SUPABASE_SERVICE_ROLE_KEY set:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log('[email/send] template_id:', template_id, '| contacts count:', contacts?.length);
+    console.log('[email/send] from_email:', from_email || '(env default)');
+
     const supabase = createAdminClient();
 
     // Fetch template
@@ -132,6 +139,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ sent, failed, errors: failed > 0 ? 'Check Vercel function logs for Resend error details' : undefined });
   } catch (error) {
+    console.error('[email/send] FATAL:', error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Send failed' },
       { status: 500 }
