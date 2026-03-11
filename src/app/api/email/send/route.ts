@@ -93,6 +93,10 @@ export async function POST(request: Request) {
 
         const result = await response.json();
 
+        if (!response.ok) {
+          console.error('Resend error:', JSON.stringify(result));
+        }
+
         if (response.ok && result.id) {
           // Record the send
           await supabase.from('email_sends').insert({
@@ -126,7 +130,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ sent, failed });
+    return NextResponse.json({ sent, failed, errors: failed > 0 ? 'Check Vercel function logs for Resend error details' : undefined });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Send failed' },
