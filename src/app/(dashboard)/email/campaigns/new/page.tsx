@@ -84,9 +84,10 @@ export default function NewCampaignPage() {
   const filteredContacts = useMemo(() => {
     if (!contactSearch.trim()) return allContacts;
     const q = contactSearch.toLowerCase();
-    return allContacts.filter(
-      (c) =>
-        [c.first_name, c.last_name, c.email].some((v) => v?.toLowerCase().includes(q))
+    return allContacts.filter((c) =>
+      [c.first_name, c.last_name, c.email]
+        .filter((v): v is string => typeof v === 'string')
+        .some((v) => v.toLowerCase().includes(q))
     );
   }, [allContacts, contactSearch]);
 
@@ -389,13 +390,19 @@ export default function NewCampaignPage() {
                           className="rounded border-navy/30 accent-gold shrink-0"
                         />
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-navy/10 to-navy/5 flex items-center justify-center text-[10px] font-semibold text-navy/60 shrink-0 ring-1 ring-navy/5">
-                          {getInitials(c.first_name, c.last_name)}
+                          {getInitials(c.first_name, c.last_name) || (c.email?.[0] ?? '?').toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-navy truncate">
-                            {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
-                          </p>
-                          <p className="text-xs text-navy/40 truncate">{c.email}</p>
+                          {[c.first_name, c.last_name].filter(Boolean).length > 0 ? (
+                            <>
+                              <p className="text-sm font-medium text-navy truncate">
+                                {[c.first_name, c.last_name].filter(Boolean).join(' ')}
+                              </p>
+                              <p className="text-xs text-navy/40 truncate">{c.email}</p>
+                            </>
+                          ) : (
+                            <p className="text-sm font-medium text-navy truncate">{c.email}</p>
+                          )}
                         </div>
                       </label>
                     ))
