@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { contact_id, subject, body } = await request.json();
+    const { contact_id, subject, body, from_email, from_name } = await request.json();
     const supabase = createAdminClient();
 
     const { data: contact } = await supabase
@@ -18,8 +18,8 @@ export async function POST(request: Request) {
     }
 
     const resendApiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@bethelresidency.com';
-    const fromName = process.env.RESEND_FROM_NAME || 'Bethel Residency';
+    const fromEmail = from_email || process.env.RESEND_FROM_EMAIL || 'noreply@bethelresidency.com';
+    const fromName = from_name || process.env.RESEND_FROM_NAME || 'Bethel Residency';
 
     if (!resendApiKey) {
       return NextResponse.json({ error: 'Resend API key not configured' }, { status: 500 });

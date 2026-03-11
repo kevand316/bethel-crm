@@ -35,6 +35,8 @@ export default function NewCampaignPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [senders, setSenders] = useState<{ id: string; name: string; email: string; is_default: boolean }[]>([]);
+  const [selectedSenderId, setSelectedSenderId] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'setup' | 'preview' | 'sending' | 'done'>('setup');
   const [sendProgress, setSendProgress] = useState({ sent: 0, total: 0 });
@@ -54,6 +56,16 @@ export default function NewCampaignPage() {
 
     const contacts = contactRes.data || [];
     setAllContacts(contacts);
+
+    // Fetch senders
+    fetch('/api/email/senders')
+      .then((r) => r.json())
+      .then((data) => {
+        const list = data.senders || [];
+        setSenders(list);
+        const def = list.find((s: { is_default: boolean }) => s.is_default) || list[0];
+        if (def) setSelectedSenderId(def.id);
+      });
 
     const tags = new Set<string>();
     contacts.forEach((c) => {
@@ -138,12 +150,15 @@ export default function NewCampaignPage() {
       const batch = matchingContacts.slice(i, i + batchSize);
 
       try {
+        const selectedSender = senders.find((s) => s.id === selectedSenderId);
         const response = await fetch('/api/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             campaign_id: campaign.id,
             template_id: templateId,
+            from_email: selectedSender?.email,
+            from_name: selectedSender?.name,
             contacts: batch.map((c) => ({
               id: c.id,
               email: c.email,
@@ -235,6 +250,26 @@ export default function NewCampaignPage() {
               </select>
             )}
           </div>
+
+          {/* From Sender */}
+          {senders.length > 0 && (
+            <div className="card p-5">
+              <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
+                From
+              </label>
+              <select
+                value={selectedSenderId}
+                onChange={(e) => setSelectedSenderId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
+              >
+                {senders.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} &lt;{s.email}&gt;{s.is_default ? ' (default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Audience */}
           <div className="card p-5 space-y-4">

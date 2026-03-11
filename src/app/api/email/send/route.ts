@@ -11,7 +11,7 @@ interface ContactPayload {
 
 export async function POST(request: Request) {
   try {
-    const { campaign_id, template_id, contacts } = await request.json();
+    const { campaign_id, template_id, contacts, from_email, from_name } = await request.json();
     const supabase = createAdminClient();
 
     // Fetch template
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     }
 
     const resendApiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@bethelresidency.com';
-    const fromName = process.env.RESEND_FROM_NAME || 'Bethel Residency';
+    const fromEmail = from_email || process.env.RESEND_FROM_EMAIL || 'noreply@bethelresidency.com';
+    const fromName = from_name || process.env.RESEND_FROM_NAME || 'Bethel Residency';
 
     if (!resendApiKey) {
       return NextResponse.json({ error: 'Resend API key not configured' }, { status: 500 });

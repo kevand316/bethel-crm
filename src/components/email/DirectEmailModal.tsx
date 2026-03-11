@@ -27,6 +27,8 @@ export default function DirectEmailModal({
   const [error, setError] = useState('');
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [senders, setSenders] = useState<{ id: string; name: string; email: string; is_default: boolean }[]>([]);
+  const [selectedSenderId, setSelectedSenderId] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -40,6 +42,14 @@ export default function DirectEmailModal({
       .select('*')
       .order('name')
       .then(({ data }) => setTemplates(data || []));
+    fetch('/api/email/senders')
+      .then((r) => r.json())
+      .then((data) => {
+        const list = data.senders || [];
+        setSenders(list);
+        const def = list.find((s: { is_default: boolean }) => s.is_default) || list[0];
+        if (def) setSelectedSenderId(def.id);
+      });
   }, [open, supabase]);
 
   const applyTemplate = (template: EmailTemplate) => {
@@ -68,6 +78,7 @@ export default function DirectEmailModal({
     setSending(true);
     setError('');
 
+    const selectedSender = senders.find((s) => s.id === selectedSenderId);
     const res = await fetch('/api/email/direct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -75,6 +86,8 @@ export default function DirectEmailModal({
         contact_id: contact.id,
         subject: subject.trim(),
         body: body.trim(),
+        from_email: selectedSender?.email,
+        from_name: selectedSender?.name,
       }),
     });
 
@@ -94,6 +107,23 @@ export default function DirectEmailModal({
   return (
     <Modal open={open} onClose={onClose} title={`Email ${contact.first_name || contact.email || 'Contact'}`}>
       <div className="space-y-3">
+        {/* From */}
+        {senders.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-cream/50 rounded-xl">
+            <Mail size={13} className="text-navy/40 shrink-0" />
+            <span className="text-xs text-navy/50 shrink-0">From:</span>
+            <select
+              value={selectedSenderId}
+              onChange={(e) => setSelectedSenderId(e.target.value)}
+              className="flex-1 bg-transparent text-xs font-medium text-navy focus:outline-none cursor-pointer"
+            >
+              {senders.map((s) => (
+                <option key={s.id} value={s.id}>{s.name} &lt;{s.email}&gt;</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* To */}
         <div className="flex items-center gap-2 px-3 py-2 bg-cream/50 rounded-xl">
           <Mail size={13} className="text-navy/40 shrink-0" />
