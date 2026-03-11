@@ -20,17 +20,25 @@ export async function POST(request: Request) {
     console.log('[email/send] from_email:', from_email || '(env default)');
 
     const supabase = createAdminClient();
+    console.log('[email/send] admin client created');
 
     // Fetch template
-    const { data: template } = await supabase
+    const { data: template, error: templateError } = await supabase
       .from('email_templates')
       .select('*')
       .eq('id', template_id)
       .single();
 
+    if (templateError) {
+      console.error('[email/send] template fetch error:', templateError.message, templateError.code);
+      return NextResponse.json({ error: `Template fetch failed: ${templateError.message}` }, { status: 500 });
+    }
+
     if (!template) {
+      console.error('[email/send] template not found for id:', template_id);
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
+    console.log('[email/send] template found:', template.name);
 
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = from_email || process.env.RESEND_FROM_EMAIL || 'noreply@bethelresidency.com';

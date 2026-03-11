@@ -40,6 +40,7 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'setup' | 'preview' | 'sending' | 'done'>('setup');
   const [sendProgress, setSendProgress] = useState({ sent: 0, total: 0 });
+  const [sendError, setSendError] = useState('');
 
   const fetchInitialData = useCallback(async () => {
     const [tmplRes, contactRes] = await Promise.all([
@@ -146,6 +147,8 @@ export default function NewCampaignPage() {
     let totalSent = 0;
     let totalFailed = 0;
 
+    let lastError = '';
+
     for (let i = 0; i < matchingContacts.length; i += batchSize) {
       const batch = matchingContacts.slice(i, i + batchSize);
 
@@ -169,9 +172,17 @@ export default function NewCampaignPage() {
         });
 
         const result = await response.json();
-        totalSent += result.sent || 0;
-        totalFailed += result.failed || 0;
-      } catch {
+
+        if (!response.ok) {
+          lastError = result.error || `HTTP ${response.status}`;
+          totalFailed += batch.length;
+        } else {
+          totalSent += result.sent || 0;
+          totalFailed += result.failed || 0;
+          if (result.errors) lastError = result.errors;
+        }
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : 'Network error';
         totalFailed += batch.length;
       }
 
@@ -187,6 +198,7 @@ export default function NewCampaignPage() {
       .update({ total_sent: totalSent, status: 'sent', sent_at: new Date().toISOString() })
       .eq('id', campaign.id);
 
+    setSendError(lastError);
     setStep('done');
     setLoading(false);
     router.prefetch('/email/campaigns');
@@ -563,9 +575,15 @@ export default function NewCampaignPage() {
             <CheckCircle size={28} className="text-green-500" />
           </div>
           <h3 className="text-lg font-serif text-navy mb-2">Campaign Sent!</h3>
-          <p className="text-sm text-navy/50 mb-6">
+          <p className="text-sm text-navy/50 mb-2">
             Successfully sent {sendProgress.sent} of {sendProgress.total} emails.
           </p>
+          {sendError && (
+            <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-left">
+              <p className="text-xs font-semibold text-red-700 mb-0.5">Error details:</p>
+              <p className="text-xs text-red-600 break-words">{sendError}</p>
+            </div>
+          )}
           <Link href="/email/campaigns">
             <Button size="sm">
               <Mail size={13} />

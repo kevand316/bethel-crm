@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import { Settings, User, Key, Bell, Copy, Check, Database, Mail, MessageSquare, ExternalLink, Plus, Trash2, Star } from 'lucide-react';
+import { Settings, User, Key, Bell, Copy, Check, Database, Mail, MessageSquare, ExternalLink, Plus, Trash2, Star, Send } from 'lucide-react';
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -22,6 +22,11 @@ export default function SettingsPage() {
   const [senderLoading, setSenderLoading] = useState(false);
   const [senderError, setSenderError] = useState('');
   const [sendersReady, setSendersReady] = useState(false);
+
+  // Test email
+  const [testEmail, setTestEmail] = useState('');
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -79,6 +84,29 @@ export default function SettingsPage() {
       body: JSON.stringify({ id }),
     });
     fetchSenders();
+  };
+
+  const handleTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmail.trim()) return;
+    setTestLoading(true);
+    setTestResult(null);
+    const defaultSender = senders.find((s) => s.is_default) || senders[0];
+    const res = await fetch('/api/email/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: testEmail.trim(),
+        from_email: defaultSender?.email,
+        from_name: defaultSender?.name,
+      }),
+    });
+    const data = await res.json();
+    setTestResult({
+      success: data.success,
+      message: data.success ? `Test email sent to ${testEmail}` : data.error || 'Unknown error',
+    });
+    setTestLoading(false);
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -365,6 +393,33 @@ export default function SettingsPage() {
               Add Sender
             </Button>
           </form>
+
+          {/* Test email */}
+          <div className="mt-5 pt-5 border-t border-cream-dark/50">
+            <p className="text-xs font-semibold text-navy/50 uppercase tracking-wider mb-3">Send Test Email</p>
+            <form onSubmit={handleTestEmail} className="flex gap-2">
+              <input
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="flex-1 px-3 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all"
+              />
+              <Button type="submit" size="sm" loading={testLoading} disabled={!testEmail.trim()}>
+                <Send size={13} />
+                Test
+              </Button>
+            </form>
+            {testResult && (
+              <div className={`mt-2 px-3 py-2.5 rounded-xl text-xs ${
+                testResult.success
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {testResult.message}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Webhook URLs */}
