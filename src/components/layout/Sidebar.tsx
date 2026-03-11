@@ -13,12 +13,14 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Tag,
 } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/contacts', label: 'Contacts', icon: Users },
+  { href: '/tags', label: 'Tags', icon: Tag },
   { href: '/email/campaigns', label: 'Email', icon: Mail },
   { href: '/sms/conversations', label: 'SMS', icon: MessageSquare },
   { href: '/settings', label: 'Settings', icon: Settings },

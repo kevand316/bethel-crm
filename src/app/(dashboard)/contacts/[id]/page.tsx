@@ -25,6 +25,7 @@ import {
   Globe,
 } from 'lucide-react';
 import Link from 'next/link';
+import SendEmailModal from '@/components/email/SendEmailModal';
 
 function DetailSkeleton() {
   return (
@@ -89,6 +90,7 @@ export default function ContactDetailPage() {
     tags: '',
   });
   const [newTag, setNewTag] = useState('');
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   const fetchContact = useCallback(async () => {
     const { data } = await supabase
@@ -479,12 +481,10 @@ export default function ContactDetailPage() {
                 {/* Quick Actions */}
                 <div className="pt-4 border-t border-cream-dark flex items-center gap-2">
                   {contact.email && (
-                    <Link href="/email/campaigns/new">
-                      <Button variant="outline" size="sm">
-                        <Mail size={13} />
-                        Send Email
-                      </Button>
-                    </Link>
+                    <Button variant="outline" size="sm" onClick={() => setShowEmailModal(true)}>
+                      <Mail size={13} />
+                      Send Email
+                    </Button>
                   )}
                   {contact.phone && (
                     <Link href={`/sms/conversations/${contactId}`}>
@@ -530,6 +530,15 @@ export default function ContactDetailPage() {
           )}
         </div>
       </div>
+
+      {contact && (
+        <SendEmailModal
+          open={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          contacts={[contact]}
+          onSuccess={() => fetchTimeline()}
+        />
+      )}
     </div>
   );
 }

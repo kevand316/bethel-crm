@@ -16,6 +16,7 @@ import {
   Plus,
   Upload,
   Tag,
+  Mail,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -23,6 +24,7 @@ import {
   Filter,
   X,
 } from 'lucide-react';
+import SendEmailModal from '@/components/email/SendEmailModal';
 
 const PAGE_SIZE = 25;
 
@@ -63,6 +65,7 @@ export default function ContactsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [showBulkTagModal, setShowBulkTagModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   const fetchContacts = useCallback(async () => {
@@ -176,10 +179,16 @@ export default function ContactsPage() {
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setShowBulkTagModal(true)}>
-              <Tag size={14} />
-              Tag ({selectedIds.size})
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => setShowEmailModal(true)}>
+                <Mail size={14} />
+                Email ({selectedIds.size})
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowBulkTagModal(true)}>
+                <Tag size={14} />
+                Tag ({selectedIds.size})
+              </Button>
+            </>
           )}
           <Button variant="outline" size="sm" onClick={() => setShowCsvModal(true)}>
             <Upload size={14} />
@@ -278,6 +287,10 @@ export default function ContactsPage() {
       {selectedIds.size > 0 && (
         <div className="card p-3 mb-4 flex items-center gap-3 animate-scale-in" style={{ background: 'var(--color-gold-50)', borderColor: 'rgba(201,168,76,0.2)' }}>
           <span className="text-sm font-medium text-navy">{selectedIds.size} selected</span>
+          <Button size="sm" variant="outline" onClick={() => setShowEmailModal(true)}>
+            <Mail size={13} />
+            Send Email
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setShowBulkTagModal(true)}>
             <Tag size={13} />
             Add Tag
@@ -488,6 +501,12 @@ export default function ContactsPage() {
         onClose={() => setShowBulkTagModal(false)}
         contactIds={Array.from(selectedIds)}
         onSuccess={() => { setShowBulkTagModal(false); setSelectedIds(new Set()); fetchContacts(); fetchTags(); }}
+      />
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        contacts={contacts.filter((c) => selectedIds.has(c.id))}
+        onSuccess={() => { setShowEmailModal(false); setSelectedIds(new Set()); }}
       />
     </div>
   );
