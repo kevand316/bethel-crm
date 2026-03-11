@@ -1,19 +1,43 @@
 import { createAdminClient } from '@/lib/supabase-admin';
 import { NextResponse } from 'next/server';
 
+async function ensureTable() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  await fetch(`${url}/rest/v1/rpc/exec`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      sql: `CREATE TABLE IF NOT EXISTS email_senders (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, is_default BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW()); ALTER TABLE email_senders ENABLE ROW LEVEL SECURITY; DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='email_senders' AND policyname='auth') THEN CREATE POLICY "auth" ON email_senders FOR ALL TO authenticated USING (true); END IF; END $$;`
+    }),
+  }).catch(() => null);
+}
+
 // GET - list configured senders + verified Resend domains
 export async function GET() {
   const supabase = createAdminClient();
 
   // Fetch configured senders from DB
-  const { data: senders, error } = await supabase
+  let { data: senders, error } = await supabase
     .from('email_senders')
     .select('*')
     .order('is_default', { ascending: false })
     .order('created_at');
 
+  // Table missing — auto-create it and retry
+  if (error?.code === '42P01') {
+    await ensureTable();
+    const retry = await supabase
+      .from('email_senders')
+      .select('*')
+      .order('is_default', { ascending: false })
+      .order('created_at');
+    senders = retry.data;
+    error = retry.error;
+  }
+
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ senders: [], verifiedDomains: [] });
   }
 
   // Fetch verified domains from Resend
@@ -32,7 +56,20 @@ export async function GET() {
     // Resend unreachable — continue without domain list
   }
 
-  return NextResponse.json({ senders: senders || [], verifiedDomains });
+  // Auto-create a default sender if none configured but domains are verified
+  let finalSenders = senders || [];
+  if (finalSenders.length === 0 && verifiedDomains.length > 0) {
+    const domain = verifiedDomains[0];
+    const defaultEmail = `noreply@${domain}`;
+    const { data: created } = await supabase
+      .from('email_senders')
+      .insert({ name: 'Bethel Residency', email: defaultEmail, is_default: true })
+      .select()
+      .single();
+    if (created) finalSenders = [created];
+  }
+
+  return NextResponse.json({ senders: finalSenders, verifiedDomains });
 }
 
 // POST - add a sender
