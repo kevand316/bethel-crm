@@ -25,7 +25,7 @@ import {
   Globe,
 } from 'lucide-react';
 import Link from 'next/link';
-import SendEmailModal from '@/components/email/SendEmailModal';
+import DirectEmailModal from '@/components/email/DirectEmailModal';
 
 function DetailSkeleton() {
   return (
@@ -532,10 +532,10 @@ export default function ContactDetailPage() {
       </div>
 
       {contact && (
-        <SendEmailModal
+        <DirectEmailModal
           open={showEmailModal}
           onClose={() => setShowEmailModal(false)}
-          contacts={[contact]}
+          contact={contact}
           onSuccess={() => fetchTimeline()}
         />
       )}

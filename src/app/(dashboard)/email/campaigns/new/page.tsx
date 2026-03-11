@@ -1,13 +1,26 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
 import { EmailTemplate, Contact } from '@/types';
-import { mergeTags } from '@/lib/utils';
+import { mergeTags, getInitials } from '@/lib/utils';
 import Button from '@/components/ui/Button';
-import { ArrowLeft, Send, Users, Eye, Edit2, CheckCircle, Mail } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Users,
+  Eye,
+  Edit2,
+  CheckCircle,
+  Mail,
+  Tag,
+  Search,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
+
+type AudienceMode = 'all' | 'tags' | 'specific';
 
 export default function NewCampaignPage() {
   const supabase = createClient();
@@ -15,56 +28,43 @@ export default function NewCampaignPage() {
 
   const [name, setName] = useState('');
   const [templateId, setTemplateId] = useState('');
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('all');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  const [contactSearch, setContactSearch] = useState('');
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
-  const [matchingContacts, setMatchingContacts] = useState<Contact[]>([]);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'setup' | 'preview' | 'sending' | 'done'>('setup');
   const [sendProgress, setSendProgress] = useState({ sent: 0, total: 0 });
 
-  const fetchTemplates = useCallback(async () => {
-    const { data } = await supabase
-      .from('email_templates')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setTemplates(data || []);
+  const fetchInitialData = useCallback(async () => {
+    const [tmplRes, contactRes] = await Promise.all([
+      supabase.from('email_templates').select('*').order('created_at', { ascending: false }),
+      supabase
+        .from('contacts')
+        .select('*')
+        .eq('status', 'active')
+        .not('email', 'is', null)
+        .order('first_name'),
+    ]);
+
+    setTemplates(tmplRes.data || []);
+
+    const contacts = contactRes.data || [];
+    setAllContacts(contacts);
+
+    const tags = new Set<string>();
+    contacts.forEach((c) => {
+      if (Array.isArray(c.tags)) c.tags.forEach((t: string) => tags.add(t));
+    });
+    setAllTags(Array.from(tags).sort());
   }, [supabase]);
 
-  const fetchTags = useCallback(async () => {
-    const { data } = await supabase.from('contacts').select('tags');
-    if (data) {
-      const tags = new Set<string>();
-      data.forEach((c) => {
-        if (Array.isArray(c.tags)) c.tags.forEach((t: string) => tags.add(t));
-      });
-      setAllTags(Array.from(tags).sort());
-    }
-  }, [supabase]);
-
-  const fetchMatchingContacts = useCallback(async () => {
-    let query = supabase
-      .from('contacts')
-      .select('*')
-      .eq('status', 'active')
-      .not('email', 'is', null);
-
-    if (selectedTags.length > 0) {
-      query = query.or(selectedTags.map((tag) => `tags.cs.${JSON.stringify([tag])}`).join(','));
-    }
-
-    const { data } = await query;
-    setMatchingContacts(data || []);
-  }, [selectedTags, supabase]);
-
   useEffect(() => {
-    fetchTemplates();
-    fetchTags();
-  }, [fetchTemplates, fetchTags]);
-
-  useEffect(() => {
-    fetchMatchingContacts();
-  }, [fetchMatchingContacts]);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -72,10 +72,40 @@ export default function NewCampaignPage() {
     );
   };
 
+  const toggleContact = (id: string) => {
+    setSelectedContactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const filteredContacts = useMemo(() => {
+    if (!contactSearch.trim()) return allContacts;
+    const q = contactSearch.toLowerCase();
+    return allContacts.filter(
+      (c) =>
+        [c.first_name, c.last_name, c.email].some((v) => v?.toLowerCase().includes(q))
+    );
+  }, [allContacts, contactSearch]);
+
+  const matchingContacts = useMemo(() => {
+    if (audienceMode === 'all') return allContacts;
+    if (audienceMode === 'tags') {
+      if (selectedTags.length === 0) return allContacts;
+      return allContacts.filter(
+        (c) => Array.isArray(c.tags) && selectedTags.some((t) => c.tags.includes(t))
+      );
+    }
+    // specific
+    return allContacts.filter((c) => selectedContactIds.has(c.id));
+  }, [audienceMode, allContacts, selectedTags, selectedContactIds]);
+
   const selectedTemplate = templates.find((t) => t.id === templateId);
 
   const handleSend = async () => {
-    if (!templateId || !name.trim()) return;
+    if (!templateId || !name.trim() || matchingContacts.length === 0) return;
     setLoading(true);
     setStep('sending');
 
@@ -84,7 +114,7 @@ export default function NewCampaignPage() {
       .insert({
         name: name.trim(),
         template_id: templateId,
-        filter_tags: selectedTags.length > 0 ? selectedTags : null,
+        filter_tags: audienceMode === 'tags' && selectedTags.length > 0 ? selectedTags : null,
         status: 'sending',
       })
       .select()
@@ -138,15 +168,12 @@ export default function NewCampaignPage() {
 
     await supabase
       .from('email_campaigns')
-      .update({
-        total_sent: totalSent,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      })
+      .update({ total_sent: totalSent, status: 'sent', sent_at: new Date().toISOString() })
       .eq('id', campaign.id);
 
     setStep('done');
     setLoading(false);
+    router.prefetch('/email/campaigns');
   };
 
   return (
@@ -180,7 +207,7 @@ export default function NewCampaignPage() {
             />
           </div>
 
-          {/* Template Selection */}
+          {/* Template */}
           <div className="card p-5">
             <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
               Email Template
@@ -201,54 +228,160 @@ export default function NewCampaignPage() {
                 <option value="">Select a template...</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} -- {t.subject || '(no subject)'}
+                    {t.name} — {t.subject || '(no subject)'}
                   </option>
                 ))}
               </select>
             )}
           </div>
 
-          {/* Tag Filter */}
-          <div className="card p-5">
-            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider mb-2">
-              Filter by Tags (optional)
+          {/* Audience */}
+          <div className="card p-5 space-y-4">
+            <label className="block text-xs font-semibold text-navy/50 uppercase tracking-wider">
+              Audience
             </label>
-            <p className="text-[10px] text-navy/35 mb-3">Leave empty to send to all active contacts with email addresses.</p>
-            {allTags.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      selectedTags.includes(tag)
-                        ? 'bg-gold text-white shadow-sm'
-                        : 'bg-cream-dark text-navy/60 hover:bg-cream-dark/80 hover:text-navy'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-navy/35">No tags found.</p>
-            )}
-          </div>
 
-          {/* Matching Contacts */}
-          <div className="card p-5">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                <Users size={14} className="text-blue-500" />
+            {/* Mode selector */}
+            <div className="flex gap-2">
+              {(
+                [
+                  { value: 'all', label: 'All Contacts', icon: Users },
+                  { value: 'tags', label: 'By Tag', icon: Tag },
+                  { value: 'specific', label: 'Pick Contacts', icon: Search },
+                ] as { value: AudienceMode; label: string; icon: React.ElementType }[]
+              ).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setAudienceMode(value)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all border ${
+                    audienceMode === value
+                      ? 'bg-gold/10 border-gold/40 text-gold-dark'
+                      : 'border-cream-dark text-navy/50 hover:border-navy/20 hover:text-navy bg-white'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* By tag */}
+            {audienceMode === 'tags' && (
+              <div className="animate-fade-in">
+                {allTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          selectedTags.includes(tag)
+                            ? 'bg-gold text-white shadow-sm'
+                            : 'bg-cream-dark text-navy/60 hover:bg-cream-dark/80 hover:text-navy'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-navy/35">No tags found.</p>
+                )}
+                {selectedTags.length === 0 && (
+                  <p className="text-xs text-navy/35 mt-2">
+                    No tags selected — will send to all active contacts.
+                  </p>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium text-navy">
-                  {matchingContacts.length} recipient{matchingContacts.length !== 1 ? 's' : ''}
-                </p>
-                <p className="text-[10px] text-navy/40">
-                  Active contacts with email. Unsubscribed and bounced excluded.
-                </p>
+            )}
+
+            {/* Specific contacts */}
+            {audienceMode === 'specific' && (
+              <div className="animate-fade-in space-y-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy/30" />
+                  <input
+                    type="text"
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="w-full pl-9 pr-8 py-2.5 border border-cream-dark rounded-xl text-sm bg-cream focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition-all placeholder-navy/30"
+                  />
+                  {contactSearch && (
+                    <button
+                      onClick={() => setContactSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-navy/30 hover:text-navy"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Select All / Clear */}
+                <div className="flex items-center gap-3 px-1">
+                  <button
+                    onClick={() =>
+                      setSelectedContactIds(new Set(filteredContacts.map((c) => c.id)))
+                    }
+                    className="text-xs text-gold-dark hover:underline"
+                  >
+                    Select all ({filteredContacts.length})
+                  </button>
+                  {selectedContactIds.size > 0 && (
+                    <button
+                      onClick={() => setSelectedContactIds(new Set())}
+                      className="text-xs text-navy/40 hover:text-navy hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {selectedContactIds.size > 0 && (
+                    <span className="text-xs text-navy/40 ml-auto">
+                      {selectedContactIds.size} selected
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-56 overflow-y-auto border border-cream-dark rounded-xl divide-y divide-cream-dark/50 bg-white">
+                  {filteredContacts.length === 0 ? (
+                    <p className="text-xs text-navy/40 text-center py-6">No contacts found.</p>
+                  ) : (
+                    filteredContacts.map((c) => (
+                      <label
+                        key={c.id}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-cream/50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedContactIds.has(c.id)}
+                          onChange={() => toggleContact(c.id)}
+                          className="rounded border-navy/30 accent-gold shrink-0"
+                        />
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-navy/10 to-navy/5 flex items-center justify-center text-[10px] font-semibold text-navy/60 shrink-0 ring-1 ring-navy/5">
+                          {getInitials(c.first_name, c.last_name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-navy truncate">
+                            {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
+                          </p>
+                          <p className="text-xs text-navy/40 truncate">{c.email}</p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
+            )}
+
+            {/* Recipient count summary */}
+            <div className="flex items-center gap-2 px-4 py-3 bg-cream/60 rounded-xl">
+              <Users size={14} className="text-navy/40 shrink-0" />
+              <span className="text-sm font-medium text-navy">
+                {matchingContacts.length} recipient{matchingContacts.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-xs text-navy/40">
+                — active contacts with email (unsubscribed &amp; bounced excluded)
+              </span>
             </div>
           </div>
 
@@ -257,9 +390,7 @@ export default function NewCampaignPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                if (templateId) setStep('preview');
-              }}
+              onClick={() => { if (templateId) setStep('preview'); }}
               disabled={!templateId}
             >
               <Eye size={13} />
@@ -283,7 +414,9 @@ export default function NewCampaignPage() {
           <div className="card p-8">
             <div className="max-w-xl mx-auto">
               <div className="flex items-center gap-2 mb-4 pb-4 border-b border-cream-dark">
-                <span className="text-xs font-semibold text-navy/40 uppercase tracking-wider">Subject:</span>
+                <span className="text-xs font-semibold text-navy/40 uppercase tracking-wider">
+                  Subject:
+                </span>
                 <span className="text-sm text-navy">
                   {mergeTags(selectedTemplate.subject || '', {
                     first_name: 'John',
@@ -303,24 +436,30 @@ export default function NewCampaignPage() {
                 }}
               />
               <p className="text-[10px] text-navy/30 mt-6 pt-4 border-t border-cream-dark">
-                * Preview uses sample data. Actual emails will use each contact&apos;s real information.
+                * Preview uses sample data. Actual emails will use each contact&apos;s real
+                information.
               </p>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setStep('setup')}>
-              <Edit2 size={13} />
-              Back to Setup
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSend}
-              disabled={matchingContacts.length === 0}
-              loading={loading}
-            >
-              <Send size={13} />
-              Send Campaign
-            </Button>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-navy/50">
+              Sending to {matchingContacts.length} contact{matchingContacts.length !== 1 ? 's' : ''}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setStep('setup')}>
+                <Edit2 size={13} />
+                Back to Setup
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSend}
+                disabled={matchingContacts.length === 0}
+                loading={loading}
+              >
+                <Send size={13} />
+                Send Campaign
+              </Button>
+            </div>
           </div>
         </div>
       )}
