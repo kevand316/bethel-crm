@@ -153,6 +153,7 @@ export default function ContactsPage() {
     if (!confirm(`Delete ${count} contact${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
     setDeleting(true);
     try {
+      let error;
       if (selectAllAcrossPages) {
         let query = supabase.from('contacts').select('id');
         if (search) {
@@ -165,15 +166,21 @@ export default function ContactsPage() {
         if (filterTag) query = query.contains('tags', JSON.stringify([filterTag]));
         const { data: allContacts } = await query;
         if (allContacts && allContacts.length > 0) {
-          await supabase.from('contacts').delete().in('id', allContacts.map((c) => c.id));
+          const { error: deleteError } = await supabase.from('contacts').delete().in('id', allContacts.map((c) => c.id));
+          error = deleteError;
         }
       } else {
-        await supabase.from('contacts').delete().in('id', Array.from(selectedIds));
+        const { error: deleteError } = await supabase.from('contacts').delete().in('id', Array.from(selectedIds));
+        error = deleteError;
       }
-      setSelectedIds(new Set());
-      setSelectAllAcrossPages(false);
-      setPage(0);
-      fetchContacts();
+      if (error) {
+        alert(`Delete failed: ${error.message}`);
+      } else {
+        setSelectedIds(new Set());
+        setSelectAllAcrossPages(false);
+        setPage(0);
+        fetchContacts();
+      }
     } finally {
       setDeleting(false);
     }
