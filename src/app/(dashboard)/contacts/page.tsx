@@ -17,6 +17,7 @@ import {
   Upload,
   Tag,
   Mail,
+  Trash2,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -62,6 +63,8 @@ export default function ContactsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAllAcrossPages, setSelectAllAcrossPages] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [showBulkTagModal, setShowBulkTagModal] = useState(false);
@@ -127,14 +130,52 @@ export default function ContactsPage() {
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectAllAcrossPages(false);
     setSelectedIds(next);
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === contacts.length) {
+    if (selectedIds.size === contacts.length && contacts.length > 0) {
       setSelectedIds(new Set());
+      setSelectAllAcrossPages(false);
     } else {
       setSelectedIds(new Set(contacts.map((c) => c.id)));
+      setSelectAllAcrossPages(false);
+    }
+  };
+
+  const handleSelectAllAcrossPages = () => {
+    setSelectAllAcrossPages(true);
+  };
+
+  const handleBulkDelete = async () => {
+    const count = selectAllAcrossPages ? totalCount : selectedIds.size;
+    if (!confirm(`Delete ${count} contact${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      if (selectAllAcrossPages) {
+        let query = supabase.from('contacts').select('id');
+        if (search) {
+          query = query.or(
+            `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+          );
+        }
+        if (filterStatus) query = query.eq('status', filterStatus);
+        if (filterSource) query = query.eq('source', filterSource);
+        if (filterTag) query = query.contains('tags', JSON.stringify([filterTag]));
+        const { data: allContacts } = await query;
+        if (allContacts && allContacts.length > 0) {
+          await supabase.from('contacts').delete().in('id', allContacts.map((c) => c.id));
+        }
+      } else {
+        await supabase.from('contacts').delete().in('id', Array.from(selectedIds));
+      }
+      setSelectedIds(new Set());
+      setSelectAllAcrossPages(false);
+      setPage(0);
+      fetchContacts();
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -182,11 +223,11 @@ export default function ContactsPage() {
             <>
               <Button variant="outline" size="sm" onClick={() => setShowEmailModal(true)}>
                 <Mail size={14} />
-                Email ({selectedIds.size})
+                Email ({selectAllAcrossPages ? totalCount : selectedIds.size})
               </Button>
               <Button variant="outline" size="sm" onClick={() => setShowBulkTagModal(true)}>
                 <Tag size={14} />
-                Tag ({selectedIds.size})
+                Tag ({selectAllAcrossPages ? totalCount : selectedIds.size})
               </Button>
             </>
           )}
@@ -285,22 +326,52 @@ export default function ContactsPage() {
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
-        <div className="card p-3 mb-4 flex items-center gap-3 animate-scale-in" style={{ background: 'var(--color-gold-50)', borderColor: 'rgba(201,168,76,0.2)' }}>
-          <span className="text-sm font-medium text-navy">{selectedIds.size} selected</span>
-          <Button size="sm" variant="outline" onClick={() => setShowEmailModal(true)}>
-            <Mail size={13} />
-            Send Email
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setShowBulkTagModal(true)}>
-            <Tag size={13} />
-            Add Tag
-          </Button>
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            className="text-xs text-navy/50 hover:text-navy ml-auto transition-colors"
-          >
-            Deselect all
-          </button>
+        <div className="card p-3 mb-4 animate-scale-in" style={{ background: 'var(--color-gold-50)', borderColor: 'rgba(201,168,76,0.2)' }}>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-navy">
+              {selectAllAcrossPages ? totalCount : selectedIds.size} selected
+            </span>
+            <Button size="sm" variant="outline" onClick={() => setShowEmailModal(true)}>
+              <Mail size={13} />
+              Send Email
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowBulkTagModal(true)}>
+              <Tag size={13} />
+              Add Tag
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkDelete}
+              disabled={deleting}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <Trash2 size={13} />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+            <button
+              onClick={() => { setSelectedIds(new Set()); setSelectAllAcrossPages(false); }}
+              className="text-xs text-navy/50 hover:text-navy ml-auto transition-colors"
+            >
+              Deselect all
+            </button>
+          </div>
+          {selectedIds.size === contacts.length && contacts.length > 0 && !selectAllAcrossPages && totalCount > contacts.length && (
+            <div className="mt-2 pt-2 border-t border-gold/20 text-xs text-navy/60">
+              All {contacts.length} contacts on this page are selected.{' '}
+              <button
+                onClick={handleSelectAllAcrossPages}
+                className="text-gold-dark font-semibold hover:underline"
+              >
+                Select all {totalCount} contacts
+              </button>
+            </div>
+          )}
+          {selectAllAcrossPages && (
+            <div className="mt-2 pt-2 border-t border-gold/20 text-xs text-navy/60">
+              All {totalCount} contacts are selected.
+            </div>
+          )}
         </div>
       )}
 
