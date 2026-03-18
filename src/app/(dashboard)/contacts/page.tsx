@@ -171,15 +171,14 @@ export default function ContactsPage() {
           error = deleteError;
         } else {
           // No filters — delete all contacts in batches to avoid URL length limits
-          let from = 0;
+          // Always fetch from position 0 since deleted records shift the list down
           const batchSize = 100;
           while (true) {
-            const { data: batch } = await supabase.from('contacts').select('id').range(from, from + batchSize - 1);
+            const { data: batch } = await supabase.from('contacts').select('id').range(0, batchSize - 1);
             if (!batch || batch.length === 0) break;
             const { error: deleteError } = await supabase.from('contacts').delete().in('id', batch.map((c) => c.id));
             if (deleteError) { error = deleteError; break; }
             if (batch.length < batchSize) break;
-            from += batchSize;
           }
         }
       } else {
