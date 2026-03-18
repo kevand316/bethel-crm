@@ -155,19 +155,32 @@ export default function ContactsPage() {
     try {
       let error;
       if (selectAllAcrossPages) {
-        let query = supabase.from('contacts').select('id');
-        if (search) {
-          query = query.or(
-            `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
-          );
-        }
-        if (filterStatus) query = query.eq('status', filterStatus);
-        if (filterSource) query = query.eq('source', filterSource);
-        if (filterTag) query = query.contains('tags', JSON.stringify([filterTag]));
-        const { data: allContacts } = await query;
-        if (allContacts && allContacts.length > 0) {
-          const { error: deleteError } = await supabase.from('contacts').delete().in('id', allContacts.map((c) => c.id));
+        // Apply filters directly to delete query to avoid huge .in() URL params
+        const hasFilters = search || filterStatus || filterSource || filterTag;
+        if (hasFilters) {
+          let deleteQuery = supabase.from('contacts').delete();
+          if (search) {
+            deleteQuery = deleteQuery.or(
+              `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+            );
+          }
+          if (filterStatus) deleteQuery = deleteQuery.eq('status', filterStatus);
+          if (filterSource) deleteQuery = deleteQuery.eq('source', filterSource);
+          if (filterTag) deleteQuery = deleteQuery.contains('tags', JSON.stringify([filterTag]));
+          const { error: deleteError } = await deleteQuery;
           error = deleteError;
+        } else {
+          // No filters — delete all contacts in batches to avoid URL length limits
+          let from = 0;
+          const batchSize = 100;
+          while (true) {
+            const { data: batch } = await supabase.from('contacts').select('id').range(from, from + batchSize - 1);
+            if (!batch || batch.length === 0) break;
+            const { error: deleteError } = await supabase.from('contacts').delete().in('id', batch.map((c) => c.id));
+            if (deleteError) { error = deleteError; break; }
+            if (batch.length < batchSize) break;
+            from += batchSize;
+          }
         }
       } else {
         const { error: deleteError } = await supabase.from('contacts').delete().in('id', Array.from(selectedIds));
